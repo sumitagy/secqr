@@ -164,7 +164,50 @@
 
     start();
   </script>
+  
+  <script>
+  // Minimal debug panel
+  const dbg = document.createElement('pre');
+  dbg.style.cssText = "padding:10px;background:#111;color:#0f0;border-radius:8px;white-space:pre-wrap;";
+  dbg.id = "dbg";
+  document.body.prepend(dbg);
+  const log = (m) => dbg.textContent += m + "\n";
+
+  log("Loaded. URL=" + location.href);
+  log("SecureContext=" + window.isSecureContext);
+
+  // Check library load
+  log("Html5Qrcode exists=" + (typeof Html5Qrcode !== "undefined"));
+  log("Html5QrcodeScanner exists=" + (typeof Html5QrcodeScanner !== "undefined"));
+
+  // Check camera API availability
+  log("mediaDevices.getUserMedia exists=" + (!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)));
+
+  // Try enumerating cameras (this often triggers permission prompt)
+  (async () => {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === "videoinput");
+      log("enumerateDevices ok, cameras=" + cams.length);
+      cams.forEach((c,i)=>log(`cam[${i}] label="${c.label}" id=${c.deviceId.slice(0,6)}...`));
+    } catch (e) {
+      log("enumerateDevices error: " + (e && e.name ? e.name : e));
+    }
+  })();
+
+  // Direct getUserMedia test to surface silent blocks
+  (async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      log("getUserMedia OK: stream tracks=" + stream.getVideoTracks().length);
+      stream.getTracks().forEach(t=>t.stop());
+    } catch (e) {
+      log("getUserMedia ERROR: " + e.name + " - " + e.message);
+    }
+  })();
+</script>
 </body>
 
 </html>
+
 
