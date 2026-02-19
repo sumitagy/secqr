@@ -3,61 +3,93 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>QR Scanner</title>
+  <title>Secure QR Scanner</title>
 
   <style>
     body {
-      font-family: system-ui, Arial, sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b0f14;
+      color: #e6edf3;
+      margin: 0;
       padding: 16px;
+      max-width: 720px;
+      margin-inline: auto;
     }
-    #reader {
-      width: 360px;
+
+    h1 {
+      font-size: 1.4rem;
       margin-bottom: 12px;
     }
-    pre {
-      background: #111;
-      color: #00ff88;
+
+    #reader {
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .card {
+      background: #111827;
+      border-radius: 12px;
+      padding: 16px;
+      margin-top: 16px;
+    }
+
+    .label {
+      color: #9ca3af;
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+    }
+
+    code {
+      display: block;
+      background: #020617;
       padding: 10px;
-      border-radius: 6px;
-      white-space: pre-wrap;
-      font-size: 13px;
+      border-radius: 8px;
+      word-break: break-all;
+      color: #93c5fd;
+    }
+
+    .status {
+      margin-top: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      font-weight: 500;
+    }
+
+    .pending {
+      background: #1e293b;
+      color: #eab308;
+    }
+
+    .info {
+      background: #020617;
+      color: #93c5fd;
+    }
+
+    button {
+      margin-top: 16px;
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    footer {
+      margin-top: 24px;
+      font-size: 0.75rem;
+      color: #6b7280;
+      text-align: center;
     }
   </style>
 </head>
 <body>
 
-<h2>QR Scanner</h2>
+<h1>🔐 Secure QR Scanner</h1>
 
-<div id="reader"></div>
-<pre id="debug"></pre>
-
-<!-- ✅ CORRECT SCRIPT TAG (THIS WAS THE BUG ALL ALONG) -->
-<script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
-
-<script>
-  const dbg = document.getElementById("debug");
-  const log = m => dbg.textContent += m + "\n";
-
-  log("Loaded");
-  log("SecureContext=" + window.isSecureContext);
-  log("Html5Qrcode=" + typeof Html5Qrcode);
-
-  if (typeof Html5Qrcode === "undefined") {
-    log("LIBRARY NOT LOADED");
-  } else {
-    Html5Qrcode.getCameras().then(cams => {
-      log("Cameras found=" + cams.length);
-
-      const qr = new Html5Qrcode("reader");
-      qr.start(
-        { facingMode: "environment" },
-        { fps: 10, qrbox: 250 },
-        text => log("SCAN=" + text),
-        () => {}
-      );
-    }).catch(err => log("ERROR=" + err));
-  }
-</script>
-
-</body>
-</html>
