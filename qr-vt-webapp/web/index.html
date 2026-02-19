@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>QR → URL + VirusTotal Check</title>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; margin: 16px; max-width: 900px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
+    #reader { width: 360px; }
+    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; flex: 1; min-width: 280px; }
+    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
+    .ok { background: #e7f7ee; color:#137333; }
+    .warn { background: #fff4e5; color:#8a4b00; }
+    .bad { background: #fde8e8; color:#a61b1b; }
+    code { word-break: break-all; display:block; margin-top:6px; }
+    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; cursor: pointer; }
+    button.primary { background: #2563eb; color: white; border-color: #2563eb; }
+    .muted { color:#666; font-size: 13px; }
+    .spacer { height: 8px; }
+  </style>
+</head>
+<body>
+  <h1>QR → URL + VirusTotal Reputation</h1>
+  <p class="muted">
+    This pilot decodes a QR to a URL and checks it on VirusTotal before you open it.
+  </p>
+
+  <div class="row">
+    <div class="card">
+      <h3>Scan QR</h3>
+      <div id="reader"></div>
+      <div class="spacer"></div>
+      <button id="stopBtn">Stop camera</button>
+      <p class="muted">Allow camera access when prompted.</p>
+    </div>
+
+    <div class="card">
+      <h3>Result</h3>
+      <div class="muted">Decoded URL:</div>
+      <code id="decodedUrl">—</code>
+
+      <div class="spacer"></div>
+      <button class="primary" id="checkBtn" disabled>Check on VirusTotal</button>
+      <button id="copyBtn" disabled>Copy URL</button>
+      <button id="openBtn" disabled>Open (confirm)</button>
+
+      <div class="spacer"></div>
+      <div class="muted">VirusTotal status:</div>
+      <div id="vtStatus">—</div>
+      <div id="vtCounts" class="muted"></div>
+      <div id="vtMeta" class="muted"></div>
+    </div>
+  </div>
+
+  <!-- QR scanner library -->
+  https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js</script>
+
+  <script>
+    const decodedUrlEl = document.getElementById("decodedUrl");
+    const checkBtn = document.getElementById("checkBtn");
+    const copyBtn = document.getElementById("copyBtn");
+    const openBtn = document.getElementById("openBtn");
+    const stopBtn = document.getElementById("stopBtn");
+    const vtStatusEl = document.getElementById("vtStatus");
+    const vtCountsEl = document.getElementById("vtCounts");
+    const vtMetaEl = document.getElementById("vtMeta");
+
+    let lastUrl = null;
+    const reader = new Html5Qrcode("reader");
+
+    function looksLikeUrl(text) {
+      try { new URL(text); return true; } catch {}
+      return /^[a-z0-9.-]+\.[a-z]{2,}([/:?#].*)?$/i.test(text);
+    }
+    function normalizeUrl(text) {
+      if (/^https?:\/\//i.test(text)) return text;
+      return "https://" + text;
+    }
+
+    function setVerdict(verdict, stats, analysisId) {
+      let cls = "ok", label = "No detections";
+      if (verdict === "malicious") { cls = "bad"; label = "Malicious detections"; }
+      else if (verdict === "suspicious") { cls = "warn"; label = "Suspicious detections"; }
+      else if (verdict === "unknown") { cls = "warn"; label = "Unknown / pending"; }
+
+      vtStatusEl.innerHTML = `<span class="badge ${cls}">${label}</span>`;
+      vtCountsEl.textContent = stats
+        ? `malicious: ${stats.malicious ?? 0}, suspicious: ${stats.suspicious ?? 0}, harmless: ${stats.harmless ?? 0}, undetected: ${stats.undetected ?? 0}`
+        : "";
+      vtMetaEl.textContent = analysisId ? `analysis: ${analysisId}` : "";
+    }
+
+    async function start() {
+      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+      const onSuccess = (decodedText) => {
+        const raw = (decodedText || "").trim();
+        if (!raw) return;
+
+        if (looksLikeUrl(raw)) {
+          lastUrl = normalizeUrl(raw);
+          decodedUrlEl.textContent = lastUrl;
+          checkBtn.disabled = false;
+          copyBtn.disabled = false;
+          openBtn.disabled = false;
+          setVerdict("unknown", null, "");
+        } else {
+          lastUrl = null;
+          decodedUrlEl.textContent = `Scanned (not a URL): ${raw}`;
+          checkBtn.disabled = true;
+          copyBtn.disabled = true;
+          openBtn.disabled = true;
+          vtStatusEl.textContent = "—";
+          vtCountsEl.textContent = "";
+          vtMetaEl.textContent = "";
+        }
+      };
+
+      const cameras = await Html5Qrcode.getCameras();
+      if (!cameras || cameras.length === 0) {
+        alert("No camera found.");
+        return;
+      }
+      await reader.start({ facingMode: "environment" }, config, onSuccess);
+    }
+
+    stopBtn.onclick = async () => { try { await reader.stop(); } catch(e) {} };
+
+    copyBtn.onclick = async () => {
+      if (!lastUrl) return;
+      await navigator.clipboard.writeText(lastUrl);
+      alert("Copied.");
+    };
+
+    openBtn.onclick = () => {
+      if (!lastUrl) return;
+      const u = new URL(lastUrl);
+      const httpsWarn = u.protocol !== "https:";
+      const msg = `Open this link?\n\n${lastUrl}\n\n${httpsWarn ? "WARNING: Not HTTPS." : ""}`;
+      if (confirm(msg)) window.open(lastUrl, "_blank", "noopener,noreferrer");
+    };
+
+    checkBtn.onclick = async () => {
+      if (!lastUrl) return;
+      setVerdict("unknown", null, "");
+      vtCountsEl.textContent = "Checking…";
+      vtMetaEl.textContent = "";
+
+      const resp = await fetch("/api/vt-check", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: lastUrl })
+      });
+
+      if (!resp.ok) {
+        vtStatusEl.innerHTML = `<span class="badge warn">Error</span>`;
+        vtCountsEl.textContent = await resp.text();
+        return;
+      }
+
+      const data = await resp.json();
+      setVerdict(data.verdict, data.stats, data.analysisId);
+    };
+
+    start();
+  </script>
+</body>
+</html>
