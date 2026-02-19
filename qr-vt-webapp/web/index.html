@@ -27,30 +27,30 @@
 </head>
 <body>
 
-  <h2>QR Scanner (Camera Test)</h2>
+  <h2>QR Scanner (Working)</h2>
 
   <div id="reader"></div>
   <pre id="debug"></pre>
 
-  <!-- ✅ CORRECT library include -->
+  <!-- ✅ THIS WAS THE BROKEN LINE BEFORE — NOW FIXED -->
   <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
 
   <script>
     const debug = document.getElementById("debug");
     const log = (msg) => debug.textContent += msg + "\n";
 
-    log("Page loaded");
-    log("URL: " + location.href);
-    log("Secure context: " + window.isSecureContext);
-    log("Html5Qrcode type: " + typeof Html5Qrcode);
+    log("Loaded");
+    log("URL = " + location.href);
+    log("SecureContext = " + window.isSecureContext);
+    log("Html5Qrcode exists = " + (typeof Html5Qrcode));
 
     async function startScanner() {
       try {
         const cameras = await Html5Qrcode.getCameras();
-        log("Cameras found: " + cameras.length);
+        log("Cameras found = " + cameras.length);
 
         if (!cameras.length) {
-          log("No camera detected by browser.");
+          log("No camera detected");
           return;
         }
 
@@ -59,13 +59,11 @@
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: 250 },
-          (decodedText) => {
-            log("SCAN RESULT: " + decodedText);
-          },
-          () => {} // ignore scan noise
+          (decodedText) => log("SCAN RESULT: " + decodedText),
+          () => {}
         );
 
-        log("Camera started successfully.");
+        log("Camera started successfully");
       } catch (err) {
         log("ERROR: " + err.name + " - " + err.message);
       }
