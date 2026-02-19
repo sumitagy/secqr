@@ -27,49 +27,43 @@
 </head>
 <body>
 
-  <h2>QR Scanner (Working)</h2>
+  <h2>QR Scanner (Final)</h2>
 
   <div id="reader"></div>
   <pre id="debug"></pre>
 
-  <!-- ✅ THIS WAS THE BROKEN LINE BEFORE — NOW FIXED -->
-  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <!-- ✅ RELIABLE CDN (NOT unpkg) -->
+  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
 
   <script>
     const debug = document.getElementById("debug");
-    const log = (msg) => debug.textContent += msg + "\n";
+    const log = (m) => debug.textContent += m + "\n";
 
     log("Loaded");
     log("URL = " + location.href);
     log("SecureContext = " + window.isSecureContext);
-    log("Html5Qrcode exists = " + (typeof Html5Qrcode));
+    log("Html5Qrcode type = " + typeof Html5Qrcode);
 
-    async function startScanner() {
+    async function start() {
       try {
-        const cameras = await Html5Qrcode.getCameras();
-        log("Cameras found = " + cameras.length);
-
-        if (!cameras.length) {
-          log("No camera detected");
-          return;
-        }
+        const cams = await Html5Qrcode.getCameras();
+        log("Cameras found = " + cams.length);
 
         const scanner = new Html5Qrcode("reader");
-
         await scanner.start(
           { facingMode: "environment" },
           { fps: 10, qrbox: 250 },
-          (decodedText) => log("SCAN RESULT: " + decodedText),
+          (txt) => log("SCAN: " + txt),
           () => {}
         );
 
-        log("Camera started successfully");
-      } catch (err) {
-        log("ERROR: " + err.name + " - " + err.message);
+        log("Camera started");
+      } catch (e) {
+        log("ERROR: " + e.name + " - " + e.message);
       }
     }
 
-    startScanner();
+    start();
   </script>
 
 </body>
