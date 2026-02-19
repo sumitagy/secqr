@@ -1,70 +1,42 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>QR Scanner</title>
-
-  <style>
-    body {
-      font-family: system-ui, Arial, sans-serif;
-      padding: 16px;
-      max-width: 900px;
-    }
-    #reader {
-      width: 360px;
-      margin-bottom: 16px;
-    }
-    pre {
-      padding: 12px;
-      background: #111;
-      color: #00ff88;
-      border-radius: 8px;
-      white-space: pre-wrap;
-      font-size: 13px;
-    }
-  </style>
 </head>
 <body>
 
-  <h2>QR Scanner (Final)</h2>
+<h2>QR Scanner Test</h2>
+<div id="reader"></div>
+<pre id="debug"></pre>
 
-  <div id="reader"></div>
-  <pre id="debug"></pre>
+<!-- ✅ THIS MUST BE A REAL SCRIPT TAG -->
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
 
-  <!-- ✅ RELIABLE CDN (NOT unpkg) -->
-  <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+<script>
+  const d = document.getElementById("debug");
+  const log = m => d.textContent += m + "\n";
 
-  <script>
-    const debug = document.getElementById("debug");
-    const log = (m) => debug.textContent += m + "\n";
+  log("Loaded");
+  log("SecureContext=" + window.isSecureContext);
+  log("Html5Qrcode=" + typeof Html5Qrcode);
 
-    log("Loaded");
-    log("URL = " + location.href);
-    log("SecureContext = " + window.isSecureContext);
-    log("Html5Qrcode type = " + typeof Html5Qrcode);
-
-    async function start() {
-      try {
-        const cams = await Html5Qrcode.getCameras();
-        log("Cameras found = " + cams.length);
-
-        const scanner = new Html5Qrcode("reader");
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: 250 },
-          (txt) => log("SCAN: " + txt),
-          () => {}
-        );
-
-        log("Camera started");
-      } catch (e) {
-        log("ERROR: " + e.name + " - " + e.message);
-      }
-    }
-
-    start();
-  </script>
+  if (typeof Html5Qrcode === "undefined") {
+    log("LIBRARY NOT LOADED");
+  } else {
+    Html5Qrcode.getCameras().then(cams => {
+      log("Cameras=" + cams.length);
+      const qr = new Html5Qrcode("reader");
+      qr.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 250 },
+        txt => log("SCAN=" + txt),
+        () => {}
+      );
+    }).catch(e => log("ERROR=" + e));
+  }
+</script>
 
 </body>
 </html>
