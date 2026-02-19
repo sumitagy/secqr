@@ -93,3 +93,67 @@
 
 <h1>🔐 Secure QR Scanner</h1>
 
+<div id="reader"></div>
+
+<div id="result" class="card" style="display:none;">
+  <div class="label">Scanned Content</div>
+  <code id="qrText"></code>
+
+  <div class="label" style="margin-top:12px;">Detected Type</div>
+  <div id="qrType" class="status info"></div>
+
+  <div class="label" style="margin-top:12px;">Security Check</div>
+  <div id="vtStatus" class="status pending">
+    VirusTotal check requires backend service
+  </div>
+
+  <button onclick="restart()">Scan another QR</button>
+</div>
+
+<footer>
+  Camera scanning is local. No data is sent automatically.
+</footer>
+
+<!-- ✅ OFFICIAL html5-qrcode UMD bundle -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+<script>
+  let qr;
+
+  function detectType(text) {
+    if (text.startsWith("upi://")) return "UPI Payment QR";
+    if (text.startsWith("http://") || text.startsWith("https://")) return "URL";
+    return "Text / Data";
+  }
+
+  async function onScanSuccess(text) {
+    await qr.stop();
+
+    document.getElementById("reader").style.display = "none";
+    document.getElementById("result").style.display = "block";
+
+    document.getElementById("qrText").textContent = text;
+    document.getElementById("qrType").textContent = detectType(text);
+
+    // Placeholder for backend VirusTotal integration
+    document.getElementById("vtStatus").textContent =
+      "VirusTotal scan will be performed via secure backend";
+  }
+
+  function restart() {
+    location.reload();
+  }
+
+  Html5Qrcode.getCameras().then(cameras => {
+    qr = new Html5Qrcode("reader");
+    qr.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: 250 },
+      onScanSuccess,
+      () => {}
+    );
+  });
+</script>
+
+</body>
+</html>
