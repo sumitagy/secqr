@@ -1,213 +1,78 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>QR → URL + VirusTotal Check</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Scanner</title>
+
   <style>
-    body { font-family: system-ui, Arial, sans-serif; margin: 16px; max-width: 900px; }
-    .row { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; }
-    #reader { width: 360px; }
-    .card { border: 1px solid #ddd; border-radius: 12px; padding: 12px; flex: 1; min-width: 280px; }
-    .badge { display: inline-block; padding: 4px 10px; border-radius: 999px; font-weight: 600; }
-    .ok { background: #e7f7ee; color:#137333; }
-    .warn { background: #fff4e5; color:#8a4b00; }
-    .bad { background: #fde8e8; color:#a61b1b; }
-    code { word-break: break-all; display:block; margin-top:6px; }
-    button { padding: 10px 12px; border-radius: 10px; border: 1px solid #ccc; cursor: pointer; }
-    button.primary { background: #2563eb; color: white; border-color: #2563eb; }
-    .muted { color:#666; font-size: 13px; }
-    .spacer { height: 8px; }
+    body {
+      font-family: system-ui, Arial, sans-serif;
+      padding: 16px;
+      max-width: 900px;
+    }
+    #reader {
+      width: 360px;
+      margin-bottom: 16px;
+    }
+    pre {
+      padding: 12px;
+      background: #111;
+      color: #00ff88;
+      border-radius: 8px;
+      white-space: pre-wrap;
+      font-size: 13px;
+    }
   </style>
 </head>
 <body>
-  <h1>QR → URL + VirusTotal Reputation</h1>
-  <p class="muted">
-    This pilot decodes a QR to a URL and checks it on VirusTotal before you open it.
-  </p>
 
-  <div class="row">
-    <div class="card">
-      <h3>Scan QR</h3>
-      <div id="reader"></div>
-      <div class="spacer"></div>
-      <button id="stopBtn">Stop camera</button>
-      <p class="muted">Allow camera access when prompted.</p>
-    </div>
+  <h2>QR Scanner (Camera Test)</h2>
 
-    <div class="card">
-      <h3>Result</h3>
-      <div class="muted">Decoded URL:</div>
-      <code id="decodedUrl">—</code>
+  <div id="reader"></div>
+  <pre id="debug"></pre>
 
-      <div class="spacer"></div>
-      <button class="primary" id="checkBtn" disabled>Check on VirusTotal</button>
-      <button id="copyBtn" disabled>Copy URL</button>
-      <button id="openBtn" disabled>Open (confirm)</button>
-
-      <div class="spacer"></div>
-      <div class="muted">VirusTotal status:</div>
-      <div id="vtStatus">—</div>
-      <div id="vtCounts" class="muted"></div>
-      <div id="vtMeta" class="muted"></div>
-    </div>
-  </div>
-
-  <!-- QR scanner library -->
-<script src = "https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
+  <!-- ✅ CORRECT library include -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.10/html5-qrcode.min.js"></script>
 
   <script>
-    const decodedUrlEl = document.getElementById("decodedUrl");
-    const checkBtn = document.getElementById("checkBtn");
-    const copyBtn = document.getElementById("copyBtn");
-    const openBtn = document.getElementById("openBtn");
-    const stopBtn = document.getElementById("stopBtn");
-    const vtStatusEl = document.getElementById("vtStatus");
-    const vtCountsEl = document.getElementById("vtCounts");
-    const vtMetaEl = document.getElementById("vtMeta");
+    const debug = document.getElementById("debug");
+    const log = (msg) => debug.textContent += msg + "\n";
 
-    let lastUrl = null;
-    const reader = new Html5Qrcode("reader");
+    log("Page loaded");
+    log("URL: " + location.href);
+    log("Secure context: " + window.isSecureContext);
+    log("Html5Qrcode type: " + typeof Html5Qrcode);
 
-    function looksLikeUrl(text) {
-      try { new URL(text); return true; } catch {}
-      return /^[a-z0-9.-]+\.[a-z]{2,}([/:?#].*)?$/i.test(text);
-    }
-    function normalizeUrl(text) {
-      if (/^https?:\/\//i.test(text)) return text;
-      return "https://" + text;
-    }
+    async function startScanner() {
+      try {
+        const cameras = await Html5Qrcode.getCameras();
+        log("Cameras found: " + cameras.length);
 
-    function setVerdict(verdict, stats, analysisId) {
-      let cls = "ok", label = "No detections";
-      if (verdict === "malicious") { cls = "bad"; label = "Malicious detections"; }
-      else if (verdict === "suspicious") { cls = "warn"; label = "Suspicious detections"; }
-      else if (verdict === "unknown") { cls = "warn"; label = "Unknown / pending"; }
-
-      vtStatusEl.innerHTML = `<span class="badge ${cls}">${label}</span>`;
-      vtCountsEl.textContent = stats
-        ? `malicious: ${stats.malicious ?? 0}, suspicious: ${stats.suspicious ?? 0}, harmless: ${stats.harmless ?? 0}, undetected: ${stats.undetected ?? 0}`
-        : "";
-      vtMetaEl.textContent = analysisId ? `analysis: ${analysisId}` : "";
-    }
-
-    async function start() {
-      const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-      const onSuccess = (decodedText) => {
-        const raw = (decodedText || "").trim();
-        if (!raw) return;
-
-        if (looksLikeUrl(raw)) {
-          lastUrl = normalizeUrl(raw);
-          decodedUrlEl.textContent = lastUrl;
-          checkBtn.disabled = false;
-          copyBtn.disabled = false;
-          openBtn.disabled = false;
-          setVerdict("unknown", null, "");
-        } else {
-          lastUrl = null;
-          decodedUrlEl.textContent = `Scanned (not a URL): ${raw}`;
-          checkBtn.disabled = true;
-          copyBtn.disabled = true;
-          openBtn.disabled = true;
-          vtStatusEl.textContent = "—";
-          vtCountsEl.textContent = "";
-          vtMetaEl.textContent = "";
+        if (!cameras.length) {
+          log("No camera detected by browser.");
+          return;
         }
-      };
 
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        alert("No camera found.");
-        return;
+        const scanner = new Html5Qrcode("reader");
+
+        await scanner.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: 250 },
+          (decodedText) => {
+            log("SCAN RESULT: " + decodedText);
+          },
+          () => {} // ignore scan noise
+        );
+
+        log("Camera started successfully.");
+      } catch (err) {
+        log("ERROR: " + err.name + " - " + err.message);
       }
-      await reader.start({ facingMode: "environment" }, config, onSuccess);
     }
 
-    stopBtn.onclick = async () => { try { await reader.stop(); } catch(e) {} };
-
-    copyBtn.onclick = async () => {
-      if (!lastUrl) return;
-      await navigator.clipboard.writeText(lastUrl);
-      alert("Copied.");
-    };
-
-    openBtn.onclick = () => {
-      if (!lastUrl) return;
-      const u = new URL(lastUrl);
-      const httpsWarn = u.protocol !== "https:";
-      const msg = `Open this link?\n\n${lastUrl}\n\n${httpsWarn ? "WARNING: Not HTTPS." : ""}`;
-      if (confirm(msg)) window.open(lastUrl, "_blank", "noopener,noreferrer");
-    };
-
-    checkBtn.onclick = async () => {
-      if (!lastUrl) return;
-      setVerdict("unknown", null, "");
-      vtCountsEl.textContent = "Checking…";
-      vtMetaEl.textContent = "";
-
-      const resp = await fetch("/api/vt-check", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: lastUrl })
-      });
-
-      if (!resp.ok) {
-        vtStatusEl.innerHTML = `<span class="badge warn">Error</span>`;
-        vtCountsEl.textContent = await resp.text();
-        return;
-      }
-
-      const data = await resp.json();
-      setVerdict(data.verdict, data.stats, data.analysisId);
-    };
-
-    start();
+    startScanner();
   </script>
-  
-  <script>
-  // Minimal debug panel
-  const dbg = document.createElement('pre');
-  dbg.style.cssText = "padding:10px;background:#111;color:#0f0;border-radius:8px;white-space:pre-wrap;";
-  dbg.id = "dbg";
-  document.body.prepend(dbg);
-  const log = (m) => dbg.textContent += m + "\n";
 
-  log("Loaded. URL=" + location.href);
-  log("SecureContext=" + window.isSecureContext);
-
-  // Check library load
-  log("Html5Qrcode exists=" + (typeof Html5Qrcode !== "undefined"));
-  log("Html5QrcodeScanner exists=" + (typeof Html5QrcodeScanner !== "undefined"));
-
-  // Check camera API availability
-  log("mediaDevices.getUserMedia exists=" + (!!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)));
-
-  // Try enumerating cameras (this often triggers permission prompt)
-  (async () => {
-    try {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d => d.kind === "videoinput");
-      log("enumerateDevices ok, cameras=" + cams.length);
-      cams.forEach((c,i)=>log(`cam[${i}] label="${c.label}" id=${c.deviceId.slice(0,6)}...`));
-    } catch (e) {
-      log("enumerateDevices error: " + (e && e.name ? e.name : e));
-    }
-  })();
-
-  // Direct getUserMedia test to surface silent blocks
-  (async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-      log("getUserMedia OK: stream tracks=" + stream.getVideoTracks().length);
-      stream.getTracks().forEach(t=>t.stop());
-    } catch (e) {
-      log("getUserMedia ERROR: " + e.name + " - " + e.message);
-    }
-  })();
-</script>
 </body>
-
 </html>
-
-
